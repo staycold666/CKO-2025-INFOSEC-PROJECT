@@ -4,9 +4,9 @@ A 2-hour AI-powered game development challenge starring Snappy!
 
 ## 🎯 Challenge Overview
 
-Create a collection of mini-games in just 2 hours using Claude Sonnet via OpenRouter API. Our star is Snappy, the Snapdocs mascot!
+Create a collection of mini-games in just 2 hours using Claude Sonnet via OpenRouter API. Our star is Snappy, the Snapdocs mascot! Our idea for this challenge is to create games starring "Snappy". From one page, users can any of the games that have been developed. For the scope of this challenge, we will focus on developing 3 of these games.An interface shall show what games are available, for example: If Snappy's Memory Cards, Word Search and Platform runner are developed, the user will navigate to a a Snapdocs page and be able to launch one of these games. The AI-model should be able to take these requirements and determine it's own tech stack to pick.
 
-## 🎲 Planned Games
+## 🎲 Planned Games:
 1. 🟢 Snappy's Color Match (Easy)
     - Simple click-based color matching game
     - AI generates color patterns
