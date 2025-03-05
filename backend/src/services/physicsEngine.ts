@@ -70,9 +70,19 @@ export class PhysicsEngine {
       y: projectile.position.y + projectile.velocity.y
     };
 
-    // Check for collisions with obstacles
-    if (this.checkProjectileObstacleCollision(newPosition, gameState.obstacles)) {
-      return { position: null, hitPlayerId: null };
+    // Check if the projectile's path intersects with any obstacle
+    // This is important for fast-moving projectiles that might "tunnel" through obstacles
+    for (const obstacle of gameState.obstacles) {
+      // Check if the line segment from current position to new position intersects with the obstacle
+      if (this.lineIntersectsRectangle(
+        projectile.position,
+        newPosition,
+        obstacle.position,
+        obstacle.width,
+        obstacle.height
+      )) {
+        return { position: null, hitPlayerId: null };
+      }
     }
 
     // Check for collisions with boundaries
@@ -153,18 +163,27 @@ export class PhysicsEngine {
    */
   private checkProjectileObstacleCollision(position: Position, obstacles: Obstacle[]): boolean {
     for (const obstacle of obstacles) {
-      // AABB collision detection with circle
-      const closestX = Math.max(obstacle.position.x, Math.min(position.x, obstacle.position.x + obstacle.width));
-      const closestY = Math.max(obstacle.position.y, Math.min(position.y, obstacle.position.y + obstacle.height));
-      
-      // Calculate distance between closest point and circle center
-      const distanceX = position.x - closestX;
-      const distanceY = position.y - closestY;
-      const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-      
-      // Check if distance is less than radius squared
-      if (distanceSquared < this.PROJECTILE_RADIUS * this.PROJECTILE_RADIUS) {
-        return true; // Collision detected
+      // Simple AABB collision check first (faster)
+      if (
+        position.x + this.PROJECTILE_RADIUS >= obstacle.position.x &&
+        position.x - this.PROJECTILE_RADIUS <= obstacle.position.x + obstacle.width &&
+        position.y + this.PROJECTILE_RADIUS >= obstacle.position.y &&
+        position.y - this.PROJECTILE_RADIUS <= obstacle.position.y + obstacle.height
+      ) {
+        // For more accurate collision, use circle vs rectangle check
+        // Find the closest point on the rectangle to the circle
+        const closestX = Math.max(obstacle.position.x, Math.min(position.x, obstacle.position.x + obstacle.width));
+        const closestY = Math.max(obstacle.position.y, Math.min(position.y, obstacle.position.y + obstacle.height));
+        
+        // Calculate distance between closest point and circle center
+        const distanceX = position.x - closestX;
+        const distanceY = position.y - closestY;
+        const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+        
+        // Check if distance is less than radius squared
+        if (distanceSquared <= this.PROJECTILE_RADIUS * this.PROJECTILE_RADIUS) {
+          return true; // Collision detected
+        }
       }
     }
     
@@ -258,6 +277,118 @@ export class PhysicsEngine {
       position.y - radius < 0 ||
       position.y + radius > this.CANVAS_HEIGHT
     );
+  }
+
+  /**
+   * Check if a line segment intersects with a rectangle
+   * @param lineStart Start point of the line segment
+   * @param lineEnd End point of the line segment
+   * @param rectPosition Top-left position of the rectangle
+   * @param rectWidth Width of the rectangle
+   * @param rectHeight Height of the rectangle
+   * @returns True if the line intersects with the rectangle, false otherwise
+   */
+  private lineIntersectsRectangle(
+    lineStart: Position,
+    lineEnd: Position,
+    rectPosition: Position,
+    rectWidth: number,
+    rectHeight: number
+  ): boolean {
+    // Check if either endpoint is inside the rectangle
+    if (this.pointInRectangle(lineStart, rectPosition, rectWidth, rectHeight) ||
+        this.pointInRectangle(lineEnd, rectPosition, rectWidth, rectHeight)) {
+      return true;
+    }
+    
+    // Check if the line intersects any of the rectangle's edges
+    const rectEdges = [
+      // Top edge
+      { start: rectPosition, end: { x: rectPosition.x + rectWidth, y: rectPosition.y } },
+      // Right edge
+      { start: { x: rectPosition.x + rectWidth, y: rectPosition.y }, end: { x: rectPosition.x + rectWidth, y: rectPosition.y + rectHeight } },
+      // Bottom edge
+      { start: { x: rectPosition.x, y: rectPosition.y + rectHeight }, end: { x: rectPosition.x + rectWidth, y: rectPosition.y + rectHeight } },
+      // Left edge
+      { start: rectPosition, end: { x: rectPosition.x, y: rectPosition.y + rectHeight } }
+    ];
+    
+    for (const edge of rectEdges) {
+      if (this.lineSegmentsIntersect(lineStart, lineEnd, edge.start, edge.end)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Check if a point is inside a rectangle
+   * @param point The point to check
+   * @param rectPosition Top-left position of the rectangle
+   * @param rectWidth Width of the rectangle
+   * @param rectHeight Height of the rectangle
+   * @returns True if the point is inside the rectangle, false otherwise
+   */
+  private pointInRectangle(
+    point: Position,
+    rectPosition: Position,
+    rectWidth: number,
+    rectHeight: number
+  ): boolean {
+    return (
+      point.x >= rectPosition.x &&
+      point.x <= rectPosition.x + rectWidth &&
+      point.y >= rectPosition.y &&
+      point.y <= rectPosition.y + rectHeight
+    );
+  }
+  
+  /**
+   * Check if two line segments intersect
+   * @param line1Start Start point of the first line segment
+   * @param line1End End point of the first line segment
+   * @param line2Start Start point of the second line segment
+   * @param line2End End point of the second line segment
+   * @returns True if the line segments intersect, false otherwise
+   */
+  private lineSegmentsIntersect(
+    line1Start: Position,
+    line1End: Position,
+    line2Start: Position,
+    line2End: Position
+  ): boolean {
+    // Calculate the direction vectors
+    const dir1 = {
+      x: line1End.x - line1Start.x,
+      y: line1End.y - line1Start.y
+    };
+    
+    const dir2 = {
+      x: line2End.x - line2Start.x,
+      y: line2End.y - line2Start.y
+    };
+    
+    // Calculate the cross product of the direction vectors
+    const crossProduct = dir1.x * dir2.y - dir1.y * dir2.x;
+    
+    // If the cross product is zero, the lines are parallel
+    if (Math.abs(crossProduct) < 0.0001) {
+      return false;
+    }
+    
+    // Calculate the difference vector between the start points
+    const diff = {
+      x: line2Start.x - line1Start.x,
+      y: line2Start.y - line1Start.y
+    };
+    
+    // Calculate the parameters for the intersection point
+    const t1 = (diff.x * dir2.y - diff.y * dir2.x) / crossProduct;
+    const t2 = (diff.x * dir1.y - diff.y * dir1.x) / crossProduct;
+    
+    // Check if the intersection point is within both line segments
+    return t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1;
   }
 
   /**
