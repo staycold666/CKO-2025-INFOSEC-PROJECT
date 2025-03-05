@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { fetchRooms, createRoom, joinRoom } from '../../store/slices/lobbySlice';
 import { GameRoom, GameSettings, User } from '../../types';
+import './Lobby.css';
 
 const Lobby: React.FC = () => {
   const [newRoomName, setNewRoomName] = useState('');
@@ -88,263 +89,233 @@ const Lobby: React.FC = () => {
     });
   };
 
-  const styles = {
-    container: {
-      maxWidth: '800px',
-      margin: '0 auto',
-      padding: '2rem',
-    },
-    header: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '2rem',
-    },
-    title: {
-      fontSize: '1.5rem',
-      fontWeight: 'bold',
-    },
-    button: {
-      backgroundColor: '#3182ce',
-      color: 'white',
-      padding: '0.5rem 1rem',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-    },
-    roomList: {
-      marginBottom: '2rem',
-    },
-    roomCard: {
-      padding: '1rem',
-      borderRadius: '4px',
-      border: '1px solid #e2e8f0',
-      marginBottom: '1rem',
-      backgroundColor: 'white',
-    },
-    roomHeader: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '0.5rem',
-    },
-    roomName: {
-      fontSize: '1.25rem',
-      fontWeight: 'bold',
-    },
-    roomInfo: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      color: '#4a5568',
-      fontSize: '0.875rem',
-      marginBottom: '1rem',
-    },
-    joinButton: {
-      backgroundColor: '#48bb78',
-      color: 'white',
-      padding: '0.5rem 1rem',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-    },
-    createForm: {
-      backgroundColor: 'white',
-      padding: '1rem',
-      borderRadius: '4px',
-      border: '1px solid #e2e8f0',
-    },
-    formGroup: {
-      marginBottom: '1rem',
-    },
-    label: {
-      display: 'block',
-      marginBottom: '0.5rem',
-      fontWeight: 'bold',
-    },
-    input: {
-      width: '100%',
-      padding: '0.5rem',
-      border: '1px solid #e2e8f0',
-      borderRadius: '4px',
-    },
-    select: {
-      width: '100%',
-      padding: '0.5rem',
-      border: '1px solid #e2e8f0',
-      borderRadius: '4px',
-    },
-    checkboxLabel: {
-      display: 'flex',
-      alignItems: 'center',
-      cursor: 'pointer',
-    },
-    checkbox: {
-      marginRight: '0.5rem',
-    },
-    formActions: {
-      display: 'flex',
-      justifyContent: 'flex-end',
-      gap: '0.5rem',
-    },
-    cancelButton: {
-      backgroundColor: '#e2e8f0',
-      color: '#4a5568',
-      padding: '0.5rem 1rem',
-      border: 'none',
-      borderRadius: '4px',
-      cursor: 'pointer',
-    },
-    loading: {
-      textAlign: 'center' as const,
-      padding: '2rem',
-    },
-    noRooms: {
-      textAlign: 'center' as const,
-      padding: '2rem',
-      color: '#4a5568',
-    },
-  };
+  // Detailed Shiba Inu SVG
+  const shibaInuSvg = `
+    <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- Main body colors -->
+      <defs>
+        <radialGradient id="bodyGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+          <stop offset="0%" style="stop-color:#F7B063" />
+          <stop offset="100%" style="stop-color:#E29B4F" />
+        </radialGradient>
+        <radialGradient id="bellyGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+          <stop offset="0%" style="stop-color:#FFF5E6" />
+          <stop offset="100%" style="stop-color:#F7E3C5" />
+        </radialGradient>
+      </defs>
+      
+      <!-- Body -->
+      <ellipse cx="100" cy="125" rx="55" ry="45" fill="url(#bodyGradient)" />
+      
+      <!-- Belly -->
+      <ellipse cx="100" cy="135" rx="35" ry="25" fill="url(#bellyGradient)" />
+      
+      <!-- Head -->
+      <circle cx="100" cy="75" r="40" fill="url(#bodyGradient)" />
+      
+      <!-- Ears -->
+      <path d="M70,55 L55,15 L85,40 Z" fill="url(#bodyGradient)" stroke="#E29B4F" stroke-width="1" />
+      <path d="M130,55 L145,15 L115,40 Z" fill="url(#bodyGradient)" stroke="#E29B4F" stroke-width="1" />
+      
+      <!-- Inner ears -->
+      <path d="M73,52 L65,25 L83,42 Z" fill="#F7E3C5" />
+      <path d="M127,52 L135,25 L117,42 Z" fill="#F7E3C5" />
+      
+      <!-- Face mask -->
+      <path d="M70,75 Q100,110 130,75 Q130,45 100,45 Q70,45 70,75 Z" fill="#F7E3C5" />
+      
+      <!-- Eyes -->
+      <ellipse cx="85" cy="70" rx="5" ry="7" fill="#000000" />
+      <ellipse cx="115" cy="70" rx="5" ry="7" fill="#000000" />
+      
+      <!-- Eye highlights -->
+      <circle cx="83" cy="68" r="2" fill="#FFFFFF" />
+      <circle cx="113" cy="68" r="2" fill="#FFFFFF" />
+      
+      <!-- Eyebrows -->
+      <path d="M75,60 Q85,55 95,60" stroke="#8B4513" stroke-width="1.5" fill="none" />
+      <path d="M105,60 Q115,55 125,60" stroke="#8B4513" stroke-width="1.5" fill="none" />
+      
+      <!-- Nose -->
+      <path d="M95,80 Q100,85 105,80 Q100,90 95,80 Z" fill="#000000" />
+      
+      <!-- Mouth -->
+      <path d="M90,90 Q100,100 110,90" stroke="#8B4513" stroke-width="1.5" fill="none" />
+      
+      <!-- Cheeks -->
+      <circle cx="75" cy="85" r="8" fill="#F7B063" opacity="0.5" />
+      <circle cx="125" cy="85" r="8" fill="#F7B063" opacity="0.5" />
+      
+      <!-- Tail -->
+      <path d="M155,125 Q180,100 170,80" stroke="url(#bodyGradient)" stroke-width="15" stroke-linecap="round" fill="none" />
+      <path d="M155,125 Q180,100 170,80" stroke="#E29B4F" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5" />
+      
+      <!-- Legs -->
+      <rect x="80" y="155" width="12" height="30" rx="6" fill="url(#bodyGradient)" />
+      <rect x="108" y="155" width="12" height="30" rx="6" fill="url(#bodyGradient)" />
+      <rect x="70" y="150" width="12" height="25" rx="6" fill="url(#bodyGradient)" />
+      <rect x="118" y="150" width="12" height="25" rx="6" fill="url(#bodyGradient)" />
+      
+      <!-- Paws -->
+      <ellipse cx="86" cy="185" rx="8" ry="4" fill="#E29B4F" />
+      <ellipse cx="114" cy="185" rx="8" ry="4" fill="#E29B4F" />
+      <ellipse cx="76" cy="175" rx="8" ry="4" fill="#E29B4F" />
+      <ellipse cx="124" cy="175" rx="8" ry="4" fill="#E29B4F" />
+    </svg>
+  `;
+  
+  // Convert SVG to base64
+  const shibaInuBase64 = `data:image/svg+xml;base64,${btoa(shibaInuSvg)}`;
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Game Lobby</h1>
-        <button 
-          style={styles.button}
-          onClick={() => setShowCreateForm(true)}
-          disabled={showCreateForm}
-        >
-          Create Room
-        </button>
+    <div className="lobby-container">
+      <div className="grass-background"></div>
+      
+      {/* Bouncing Shiba Inu */}
+      <div className="shiba-container">
+        <img src={shibaInuBase64} alt="Shiba Inu" className="shiba-image" />
       </div>
-
-      {showCreateForm && (
-        <div style={styles.createForm}>
-          <h2>Create New Room</h2>
-          <form onSubmit={handleCreateRoom}>
-            <div style={styles.formGroup}>
-              <label htmlFor="roomName" style={styles.label}>Room Name</label>
-              <input
-                id="roomName"
-                type="text"
-                value={newRoomName}
-                onChange={(e) => setNewRoomName(e.target.value)}
-                style={styles.input}
-                required
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label htmlFor="timeLimit" style={styles.label}>Time Limit (seconds)</label>
-              <input
-                id="timeLimit"
-                name="timeLimit"
-                type="number"
-                min="60"
-                max="600"
-                value={settings.timeLimit}
-                onChange={handleSettingChange}
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label htmlFor="scoreLimit" style={styles.label}>Score Limit</label>
-              <input
-                id="scoreLimit"
-                name="scoreLimit"
-                type="number"
-                min="5"
-                max="50"
-                value={settings.scoreLimit}
-                onChange={handleSettingChange}
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label htmlFor="mapId" style={styles.label}>Map</label>
-              <select
-                id="mapId"
-                name="mapId"
-                value={settings.mapId}
-                onChange={handleSettingChange}
-                style={styles.select}
-              >
-                <option value="map1">Arena 1</option>
-                <option value="map2">Arena 2</option>
-                <option value="map3">Arena 3</option>
-              </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  name="friendlyFire"
-                  checked={settings.friendlyFire}
-                  onChange={handleSettingChange}
-                  style={styles.checkbox}
-                />
-                Enable Friendly Fire
-              </label>
-            </div>
-
-            <div style={styles.formActions}>
-              <button
-                type="button"
-                style={styles.cancelButton}
-                onClick={() => setShowCreateForm(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                style={styles.button}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Creating...' : 'Create Room'}
-              </button>
-            </div>
-          </form>
+      
+      <div className="content-container">
+        <div className="header">
+          <h1 className="title">Game Lobby</h1>
+          <button 
+            className="button"
+            onClick={() => setShowCreateForm(true)}
+            disabled={showCreateForm}
+          >
+            Create Room
+          </button>
         </div>
-      )}
 
-      <div style={styles.roomList}>
-        <h2>Available Rooms</h2>
-        
-        {isLoading && !rooms.length ? (
-          <div style={styles.loading}>Loading rooms...</div>
-        ) : !rooms.length ? (
-          <div style={styles.noRooms}>No rooms available. Create one to get started!</div>
-        ) : (
-          rooms.map((room) => (
-            <div key={room.id} style={styles.roomCard}>
-              <div style={styles.roomHeader}>
-                <h3 style={styles.roomName}>{room.name}</h3>
-                <span>{room.status}</span>
+        {showCreateForm && (
+          <div className="create-form">
+            <h2>Create New Room</h2>
+            <form onSubmit={handleCreateRoom}>
+              <div className="form-group">
+                <label htmlFor="roomName" className="label">Room Name</label>
+                <input
+                  id="roomName"
+                  type="text"
+                  value={newRoomName}
+                  onChange={(e) => setNewRoomName(e.target.value)}
+                  className="input"
+                  required
+                />
               </div>
-              
-              <div style={styles.roomInfo}>
-                <span>Host: {room.host.username}</span>
-                <span>Players: {room.players.length}/{room.maxPlayers}</span>
-                <span>Map: {room.settings.mapId === 'map1' ? 'Arena 1' : room.settings.mapId === 'map2' ? 'Arena 2' : 'Arena 3'}</span>
+
+              <div className="form-group">
+                <label htmlFor="timeLimit" className="label">Time Limit (seconds)</label>
+                <input
+                  id="timeLimit"
+                  name="timeLimit"
+                  type="number"
+                  min="60"
+                  max="600"
+                  value={settings.timeLimit}
+                  onChange={handleSettingChange}
+                  className="input"
+                />
               </div>
-              
-              <button
-                style={styles.joinButton}
-                onClick={() => handleJoinRoom(room.id)}
-                disabled={isLoading || room.status !== 'waiting' || room.players.length >= room.maxPlayers}
-              >
-                {room.status !== 'waiting' 
-                  ? 'Game in Progress' 
-                  : room.players.length >= room.maxPlayers 
-                    ? 'Room Full' 
-                    : 'Join Game'}
-              </button>
-            </div>
-          ))
+
+              <div className="form-group">
+                <label htmlFor="scoreLimit" className="label">Score Limit</label>
+                <input
+                  id="scoreLimit"
+                  name="scoreLimit"
+                  type="number"
+                  min="5"
+                  max="50"
+                  value={settings.scoreLimit}
+                  onChange={handleSettingChange}
+                  className="input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="mapId" className="label">Map</label>
+                <select
+                  id="mapId"
+                  name="mapId"
+                  value={settings.mapId}
+                  onChange={handleSettingChange}
+                  className="select"
+                >
+                  <option value="map1">Arena 1</option>
+                  <option value="map2">Arena 2</option>
+                  <option value="map3">Arena 3</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="friendlyFire"
+                    checked={settings.friendlyFire}
+                    onChange={handleSettingChange}
+                    className="checkbox"
+                  />
+                  Enable Friendly Fire
+                </label>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Creating...' : 'Create Room'}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
+
+        <div className="room-list">
+          <h2>Available Rooms</h2>
+          
+          {isLoading && !rooms.length ? (
+            <div className="loading">Loading rooms...</div>
+          ) : !rooms.length ? (
+            <div className="no-rooms">No rooms available. Create one to get started!</div>
+          ) : (
+            rooms.map((room) => (
+              <div key={room.id} className="room-card">
+                <div className="room-header">
+                  <h3 className="room-name">{room.name}</h3>
+                  <span>{room.status}</span>
+                </div>
+                
+                <div className="room-info">
+                  <span>Host: {room.host.username}</span>
+                  <span>Players: {room.players.length}/{room.maxPlayers}</span>
+                  <span>Map: {room.settings.mapId === 'map1' ? 'Arena 1' : room.settings.mapId === 'map2' ? 'Arena 2' : 'Arena 3'}</span>
+                </div>
+                
+                <button
+                  className="join-button"
+                  onClick={() => handleJoinRoom(room.id)}
+                  disabled={isLoading || room.status !== 'waiting' || room.players.length >= room.maxPlayers}
+                >
+                  {room.status !== 'waiting' 
+                    ? 'Game in Progress' 
+                    : room.players.length >= room.maxPlayers 
+                      ? 'Room Full' 
+                      : 'Join Game'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

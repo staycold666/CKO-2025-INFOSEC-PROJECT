@@ -8,14 +8,14 @@ import socketService from './services/socket/socketService';
 
 // Import components
 import PrivateRoute from './components/auth/PrivateRoute';
+import Login from './pages/AuthPages/Login';
+import Register from './pages/AuthPages/Register';
+import NotFound from './pages/NotFound';
+import Lobby from './pages/GamePages/Lobby';
 
 // Placeholder components until we create the real ones
-const Login = () => <div>Login Page</div>;
-const Register = () => <div>Register Page</div>;
-const Lobby = () => <div>Lobby Page</div>;
 const GameRoom = () => <div>Game Room Page</div>;
 const Profile = () => <div>Profile Page</div>;
-const NotFound = () => <div>404 - Page Not Found</div>;
 
 // AppContent component to use hooks
 const AppContent: React.FC = () => {

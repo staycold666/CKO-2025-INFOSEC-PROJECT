@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AuthState, LoginCredentials, RegisterCredentials, User } from '../../types';
+import apiService from '../../services/api/apiService';
 
 // Initial state
 const initialState: AuthState = {
@@ -9,8 +10,6 @@ const initialState: AuthState = {
   isLoading: false,
   error: null,
 };
-
-import apiService from '../../services/api/apiService';
 
 // Async thunks
 export const login = createAsyncThunk(
