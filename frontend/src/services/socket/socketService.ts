@@ -26,14 +26,22 @@ class SocketService {
   connect() {
     if (this.socket) return;
 
+    // Make sure we have a token
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found, cannot connect to socket');
+      return;
+    }
+
     this.socket = io(this.API_URL, {
       transports: ['websocket'],
       auth: {
-        token: localStorage.getItem('token'),
+        token,
       },
     });
 
     this.setupEventListeners();
+    console.log('Socket connection initialized');
   }
 
   // Disconnect socket
