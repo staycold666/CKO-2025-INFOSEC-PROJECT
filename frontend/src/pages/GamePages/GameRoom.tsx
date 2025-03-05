@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
 import { leaveGame, startGame } from '../../store/slices/gameSlice';
 import { leaveRoom } from '../../store/slices/lobbySlice';
 import socketService from '../../services/socket/socketService';
-import { GameState, Player } from '../../types';
+import { GameState, Player, Position } from '../../types';
+import GameCanvas from '../../components/game/arena/GameCanvas';
+import GameControls from '../../components/game/controls/GameControls';
 
 const GameRoom: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [keys, setKeys] = useState<{ [key: string]: boolean }>({});
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+  const canvasWidth = 800;
+  const canvasHeight = 600;
   
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -47,180 +50,38 @@ const GameRoom: React.FC = () => {
     };
   }, [roomId, navigate]);
 
-  // Set up keyboard controls
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      setKeys((prevKeys) => ({ ...prevKeys, [e.key]: true }));
-    };
-    
-    const handleKeyUp = (e: KeyboardEvent) => {
-      setKeys((prevKeys) => ({ ...prevKeys, [e.key]: false }));
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
-
-  // Handle player movement based on key presses
-  useEffect(() => {
+  // Handle player movement
+  const handlePlayerMove = useCallback((position: Position) => {
     if (gameState.status !== 'playing') return;
-    
-    const moveInterval = setInterval(() => {
-      let moved = false;
-      const position = { x: 0, y: 0 };
-      
-      if (keys['ArrowUp'] || keys['w']) {
-        position.y = -5;
-        moved = true;
-      }
-      if (keys['ArrowDown'] || keys['s']) {
-        position.y = 5;
-        moved = true;
-      }
-      if (keys['ArrowLeft'] || keys['a']) {
-        position.x = -5;
-        moved = true;
-      }
-      if (keys['ArrowRight'] || keys['d']) {
-        position.x = 5;
-        moved = true;
-      }
-      
-      if (moved) {
-        socketService.movePlayer(position);
-      }
-    }, 50);
-    
-    return () => clearInterval(moveInterval);
-  }, [keys, gameState.status]);
-
-  // Handle shooting on mouse click
-  useEffect(() => {
-    if (!canvasRef.current || gameState.status !== 'playing') return;
-    
-    const handleClick = (e: MouseEvent) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      // Calculate direction angle in radians
-      const playerPosition = getPlayerPosition();
-      if (!playerPosition) return;
-      
-      const dx = x - playerPosition.x;
-      const dy = y - playerPosition.y;
-      const angle = Math.atan2(dy, dx);
-      
-      socketService.shoot(playerPosition, angle);
-    };
-    
-    canvasRef.current.addEventListener('click', handleClick);
-    
-    return () => {
-      if (canvasRef.current) {
-        canvasRef.current.removeEventListener('click', handleClick);
-      }
-    };
+    socketService.movePlayer(position);
   }, [gameState.status]);
 
-  // Render game on canvas
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const renderGame = () => {
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw background
-      ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw obstacles
-      ctx.fillStyle = '#555555';
-      gameState.obstacles.forEach((obstacle) => {
-        ctx.fillRect(obstacle.position.x, obstacle.position.y, obstacle.width, obstacle.height);
-      });
-      
-      // Draw players
-      Object.values(gameState.players).forEach((player) => {
-        ctx.fillStyle = player.color;
-        ctx.beginPath();
-        ctx.arc(player.position.x, player.position.y, 20, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw player name
-        ctx.fillStyle = '#000000';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(player.username, player.position.x, player.position.y - 30);
-        
-        // Draw health bar
-        const healthBarWidth = 40;
-        const healthPercentage = player.health / 100;
-        
-        ctx.fillStyle = '#ff0000';
-        ctx.fillRect(player.position.x - healthBarWidth / 2, player.position.y - 25, healthBarWidth, 5);
-        
-        ctx.fillStyle = '#00ff00';
-        ctx.fillRect(
-          player.position.x - healthBarWidth / 2,
-          player.position.y - 25,
-          healthBarWidth * healthPercentage,
-          5
-        );
-      });
-      
-      // Draw projectiles
-      ctx.fillStyle = '#ff0000';
-      Object.values(gameState.projectiles).forEach((projectile) => {
-        ctx.beginPath();
-        ctx.arc(projectile.position.x, projectile.position.y, 5, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      
-      // Request next frame
-      requestAnimationFrame(renderGame);
-    };
-    
-    renderGame();
-  }, [gameState]);
+  // Handle player rotation
+  const handlePlayerRotate = useCallback((rotation: number) => {
+    if (gameState.status !== 'playing') return;
+    socketService.rotatePlayer(rotation);
+  }, [gameState.status]);
 
-  const getPlayerPosition = (): { x: number; y: number } | null => {
-    if (!user) return null;
-    
-    const player = Object.values(gameState.players).find(
-      (p) => p.id === user.id
-    );
-    
-    return player ? player.position : null;
-  };
+  // Handle player shooting
+  const handlePlayerShoot = useCallback((position: Position, angle: number) => {
+    if (gameState.status !== 'playing') return;
+    socketService.shoot(position, angle);
+  }, [gameState.status]);
 
-  const handleStartGame = () => {
+  const handleStartGame = useCallback(() => {
     if (!roomId || !isHost) return;
     
     socketService.startGame(roomId);
     dispatch(startGame({ timeLimit: currentRoom.settings.timeLimit }));
-  };
+  }, [roomId, isHost, dispatch, currentRoom]);
 
-  const handleLeaveGame = () => {
+  const handleLeaveGame = useCallback(() => {
     if (!roomId || !user) return;
     
     dispatch(leaveGame());
     dispatch(leaveRoom({ roomId, userId: user.id }));
     navigate('/lobby');
-  };
+  }, [roomId, user, dispatch, navigate]);
 
   const styles = {
     container: {
@@ -259,6 +120,7 @@ const GameRoom: React.FC = () => {
       display: 'flex',
       flexDirection: 'column' as const,
       alignItems: 'center',
+      position: 'relative' as const,
     },
     canvas: {
       border: '1px solid #000',
@@ -431,13 +293,23 @@ const GameRoom: React.FC = () => {
         </div>
       </div>
       
-      <div style={styles.gameContainer}>
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={600}
-          style={styles.canvas}
+      <div style={styles.gameContainer} ref={gameContainerRef}>
+        <GameCanvas
+          width={canvasWidth}
+          height={canvasHeight}
+          onShoot={handlePlayerShoot}
+          currentPlayerId={user?.id}
         />
+        
+        {gameState.status === 'playing' && (
+          <GameControls
+            onMove={handlePlayerMove}
+            onRotate={handlePlayerRotate}
+            currentPlayerId={user?.id}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+          />
+        )}
         
         <div style={styles.scoreBoard}>
           <div style={styles.scoreHeader}>

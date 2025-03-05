@@ -1,59 +1,13 @@
 import { Server, Socket } from 'socket.io';
 import { DefaultEventsMap } from 'socket.io/dist/typed-events';
+import { Position, Player, Projectile, Obstacle, GameState } from '../types';
+import { PhysicsEngine } from './physicsEngine';
 
-// Game state interfaces
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface Player {
-  id: string;
-  username: string;
-  position: Position;
-  rotation: number;
-  health: number;
-  score: number;
-  isActive: boolean;
-  lastShot: number;
-  color: string;
-}
-
-interface Projectile {
-  id: string;
-  playerId: string;
-  position: Position;
-  velocity: Position;
-  damage: number;
-  createdAt: number;
-}
-
-interface Obstacle {
-  id: string;
-  position: Position;
-  width: number;
-  height: number;
-  type: 'wall' | 'barrier' | 'cover';
-}
-
-interface GameRoom {
-  id: string;
-  players: Record<string, Player>;
-  projectiles: Record<string, Projectile>;
-  obstacles: Obstacle[];
-  status: 'waiting' | 'countdown' | 'playing' | 'paused' | 'finished';
-  timeRemaining: number;
-  winner: string | null;
-  settings: {
-    timeLimit: number;
-    scoreLimit: number;
-    mapId: string;
-    friendlyFire: boolean;
-  };
-}
+// Initialize physics engine
+const physicsEngine = new PhysicsEngine();
 
 // Game rooms storage
-const gameRooms: Record<string, GameRoom> = {};
+const gameRooms: Record<string, GameState> = {};
 
 // Game loop interval
 const GAME_TICK_RATE = 60; // 60 updates per second
@@ -119,10 +73,10 @@ export const createGameEvents = (io: Server<DefaultEventsMap, DefaultEventsMap, 
       // Create game room if it doesn't exist
       if (!gameRooms[roomId]) {
         gameRooms[roomId] = {
-          id: roomId,
+          roomId: roomId,
           players: {},
           projectiles: {},
-          obstacles: generateObstacles(),
+          obstacles: physicsEngine.generateObstacles('map1'),
           status: 'countdown',
           timeRemaining: 5, // 5 second countdown
           winner: null,
@@ -152,18 +106,16 @@ export const createGameEvents = (io: Server<DefaultEventsMap, DefaultEventsMap, 
       if (!roomId) return;
       
       // Update player position
-      const gameRoom = gameRooms[roomId];
-      if (gameRoom && gameRoom.players[socket.id]) {
-        const player = gameRoom.players[socket.id];
+      const gameState = gameRooms[roomId];
+      if (gameState && gameState.players[socket.id]) {
+        const player = gameState.players[socket.id];
         
-        // Calculate new position
-        const newX = player.position.x + position.x;
-        const newY = player.position.y + position.y;
+        // Calculate new position using physics engine
+        const newPosition = physicsEngine.calculatePlayerMovement(player, position, gameState);
         
-        // Check for collisions with obstacles
-        if (!checkCollision(newX, newY, gameRoom.obstacles)) {
-          player.position.x = newX;
-          player.position.y = newY;
+        if (newPosition) {
+          // Update player position
+          player.position = newPosition;
           
           // Broadcast position update to other players
           socket.to(roomId).emit('player:move', {
@@ -181,9 +133,9 @@ export const createGameEvents = (io: Server<DefaultEventsMap, DefaultEventsMap, 
       if (!roomId) return;
       
       // Update player rotation
-      const gameRoom = gameRooms[roomId];
-      if (gameRoom && gameRoom.players[socket.id]) {
-        gameRoom.players[socket.id].rotation = rotation;
+      const gameState = gameRooms[roomId];
+      if (gameState && gameState.players[socket.id]) {
+        gameState.players[socket.id].rotation = rotation;
         
         // Broadcast rotation update to other players
         socket.to(roomId).emit('player:rotate', {
@@ -200,9 +152,9 @@ export const createGameEvents = (io: Server<DefaultEventsMap, DefaultEventsMap, 
       if (!roomId) return;
       
       // Check if player can shoot
-      const gameRoom = gameRooms[roomId];
-      if (gameRoom && gameRoom.players[socket.id]) {
-        const player = gameRoom.players[socket.id];
+      const gameState = gameRooms[roomId];
+      if (gameState && gameState.players[socket.id]) {
+        const player = gameState.players[socket.id];
         const now = Date.now();
         
         // Rate limit shooting (500ms cooldown)
@@ -211,22 +163,11 @@ export const createGameEvents = (io: Server<DefaultEventsMap, DefaultEventsMap, 
         // Update last shot time
         player.lastShot = now;
         
-        // Create projectile
-        const projectileId = `${socket.id}-${now}`;
-        const projectile: Projectile = {
-          id: projectileId,
-          playerId: socket.id,
-          position: { ...position },
-          velocity: {
-            x: Math.cos(direction) * 10,
-            y: Math.sin(direction) * 10
-          },
-          damage: 10,
-          createdAt: now
-        };
+        // Create projectile using physics engine
+        const projectile = physicsEngine.createProjectile(socket.id, position, direction);
         
-        // Add projectile to game room
-        gameRoom.projectiles[projectileId] = projectile;
+        // Add projectile to game state
+        gameState.projectiles[projectile.id] = projectile;
         
         // Broadcast projectile creation to all players
         io.to(roomId).emit('projectile:create', projectile);
@@ -267,65 +208,22 @@ const findPlayerRoom = (playerId: string): string | null => {
   return null;
 };
 
-// Helper function to check collision with obstacles
-const checkCollision = (x: number, y: number, obstacles: Obstacle[]): boolean => {
-  // Player radius
-  const playerRadius = 20;
-  
-  // Check collision with each obstacle
-  for (const obstacle of obstacles) {
-    // Simple AABB collision check with player as a circle
-    const closestX = Math.max(obstacle.position.x, Math.min(x, obstacle.position.x + obstacle.width));
-    const closestY = Math.max(obstacle.position.y, Math.min(y, obstacle.position.y + obstacle.height));
-    
-    // Calculate distance between closest point and circle center
-    const distanceX = x - closestX;
-    const distanceY = y - closestY;
-    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-    
-    // Check if distance is less than radius squared
-    if (distanceSquared < playerRadius * playerRadius) {
-      return true; // Collision detected
-    }
-  }
-  
-  return false; // No collision
-};
+// Collision detection is now handled by the physics engine
 
-// Helper function to generate obstacles for a map
-const generateObstacles = (): Obstacle[] => {
-  // Simple map with some obstacles
-  return [
-    // Walls
-    { id: 'wall-top', position: { x: 0, y: 0 }, width: 800, height: 20, type: 'wall' },
-    { id: 'wall-right', position: { x: 780, y: 0 }, width: 20, height: 600, type: 'wall' },
-    { id: 'wall-bottom', position: { x: 0, y: 580 }, width: 800, height: 20, type: 'wall' },
-    { id: 'wall-left', position: { x: 0, y: 0 }, width: 20, height: 600, type: 'wall' },
-    
-    // Barriers
-    { id: 'barrier-1', position: { x: 200, y: 150 }, width: 50, height: 200, type: 'barrier' },
-    { id: 'barrier-2', position: { x: 550, y: 250 }, width: 50, height: 200, type: 'barrier' },
-    
-    // Cover
-    { id: 'cover-1', position: { x: 350, y: 100 }, width: 100, height: 50, type: 'cover' },
-    { id: 'cover-2', position: { x: 350, y: 450 }, width: 100, height: 50, type: 'cover' },
-    { id: 'cover-3', position: { x: 150, y: 300 }, width: 50, height: 50, type: 'cover' },
-    { id: 'cover-4', position: { x: 600, y: 300 }, width: 50, height: 50, type: 'cover' }
-  ];
-};
+// Obstacles are now generated by the physics engine
 
 // Update all game rooms
 const updateGames = (io: Server) => {
   for (const roomId in gameRooms) {
-    const gameRoom = gameRooms[roomId];
+    const gameState = gameRooms[roomId];
     
     // Update game based on status
-    switch (gameRoom.status) {
+    switch (gameState.status) {
       case 'countdown':
-        updateCountdown(io, roomId, gameRoom);
+        updateCountdown(io, roomId, gameState);
         break;
       case 'playing':
-        updatePlaying(io, roomId, gameRoom);
+        updatePlaying(io, roomId, gameState);
         break;
       case 'finished':
         // No updates needed for finished games
@@ -337,23 +235,23 @@ const updateGames = (io: Server) => {
 };
 
 // Update countdown phase
-const updateCountdown = (io: Server, roomId: string, gameRoom: GameRoom) => {
+const updateCountdown = (io: Server, roomId: string, gameState: GameState) => {
   // Decrease time remaining
-  gameRoom.timeRemaining -= TICK_INTERVAL / 1000;
+  gameState.timeRemaining -= TICK_INTERVAL / 1000;
   
   // Check if countdown is finished
-  if (gameRoom.timeRemaining <= 0) {
+  if (gameState.timeRemaining <= 0) {
     // Start the game
-    gameRoom.status = 'playing';
-    gameRoom.timeRemaining = gameRoom.settings.timeLimit;
+    gameState.status = 'playing';
+    gameState.timeRemaining = gameState.settings.timeLimit;
     
     // Initialize players if not already done
-    const players = Object.keys(gameRoom.players);
+    const players = Object.keys(gameState.players);
     if (players.length === 0) {
       // Get players from socket room
       const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
       if (socketsInRoom) {
-        const playerPositions = generatePlayerPositions(socketsInRoom.size);
+        const playerPositions = physicsEngine.generatePlayerPositions(socketsInRoom.size);
         let i = 0;
         
         for (const socketId of socketsInRoom) {
@@ -363,7 +261,7 @@ const updateCountdown = (io: Server, roomId: string, gameRoom: GameRoom) => {
             const userData = socket.data.user || { id: socketId, username: `Player ${i + 1}` };
             
             // Create player
-            gameRoom.players[socketId] = {
+            gameState.players[socketId] = {
               id: socketId,
               username: userData.username,
               position: playerPositions[i] || { x: 400, y: 300 },
@@ -385,107 +283,94 @@ const updateCountdown = (io: Server, roomId: string, gameRoom: GameRoom) => {
     io.to(roomId).emit('game:start');
     
     // Send initial game state
-    io.to(roomId).emit('game:sync', gameRoom);
+    io.to(roomId).emit('game:sync', gameState);
   } else {
     // Send countdown update every second
-    if (Math.floor(gameRoom.timeRemaining) !== Math.floor(gameRoom.timeRemaining + TICK_INTERVAL / 1000)) {
-      io.to(roomId).emit('game:time', Math.floor(gameRoom.timeRemaining));
+    if (Math.floor(gameState.timeRemaining) !== Math.floor(gameState.timeRemaining + TICK_INTERVAL / 1000)) {
+      io.to(roomId).emit('game:time', Math.floor(gameState.timeRemaining));
     }
   }
 };
 
 // Update playing phase
-const updatePlaying = (io: Server, roomId: string, gameRoom: GameRoom) => {
+const updatePlaying = (io: Server, roomId: string, gameState: GameState) => {
   // Decrease time remaining
-  gameRoom.timeRemaining -= TICK_INTERVAL / 1000;
+  gameState.timeRemaining -= TICK_INTERVAL / 1000;
   
   // Update projectiles
-  updateProjectiles(io, roomId, gameRoom);
+  updateProjectiles(io, roomId, gameState);
   
   // Check win conditions
-  checkWinConditions(io, roomId, gameRoom);
+  checkWinConditions(io, roomId, gameState);
   
   // Send time update every second
-  if (Math.floor(gameRoom.timeRemaining) !== Math.floor(gameRoom.timeRemaining + TICK_INTERVAL / 1000)) {
-    io.to(roomId).emit('game:time', Math.floor(gameRoom.timeRemaining));
+  if (Math.floor(gameState.timeRemaining) !== Math.floor(gameState.timeRemaining + TICK_INTERVAL / 1000)) {
+    io.to(roomId).emit('game:time', Math.floor(gameState.timeRemaining));
   }
   
   // Periodically sync full game state (every 5 seconds)
   if (Math.floor(Date.now() / 5000) !== Math.floor((Date.now() - TICK_INTERVAL) / 5000)) {
-    io.to(roomId).emit('game:sync', gameRoom);
+    io.to(roomId).emit('game:sync', gameState);
   }
 };
 
 // Update projectiles
-const updateProjectiles = (io: Server, roomId: string, gameRoom: GameRoom) => {
+const updateProjectiles = (io: Server, roomId: string, gameState: GameState) => {
   const projectilesToRemove: string[] = [];
   
   // Update each projectile
-  for (const projectileId in gameRoom.projectiles) {
-    const projectile = gameRoom.projectiles[projectileId];
+  for (const projectileId in gameState.projectiles) {
+    const projectile = gameState.projectiles[projectileId];
     
-    // Update position
-    projectile.position.x += projectile.velocity.x;
-    projectile.position.y += projectile.velocity.y;
+    // Update position using physics engine
+    const result = physicsEngine.calculateProjectileMovement(projectile, gameState);
     
-    // Check for collisions with obstacles
-    if (checkProjectileObstacleCollision(projectile, gameRoom.obstacles)) {
-      projectilesToRemove.push(projectileId);
-      continue;
-    }
-    
-    // Check for collisions with players
-    const hitPlayer = checkProjectilePlayerCollision(projectile, gameRoom);
-    if (hitPlayer) {
+    // If collision with obstacle or boundary
+    if (!result.position) {
       projectilesToRemove.push(projectileId);
       
-      // Update player health
-      const player = gameRoom.players[hitPlayer];
-      player.health -= projectile.damage;
-      
-      // Check if player is eliminated
-      if (player.health <= 0) {
-        player.health = 0;
-        player.isActive = false;
+      // If hit a player
+      if (result.hitPlayerId) {
+        // Update player health
+        const player = gameState.players[result.hitPlayerId];
+        player.health -= projectile.damage;
         
-        // Award point to shooter
-        const shooter = gameRoom.players[projectile.playerId];
-        if (shooter) {
-          shooter.score += 1;
+        // Check if player is eliminated
+        if (player.health <= 0) {
+          player.health = 0;
+          player.isActive = false;
           
-          // Notify all players of score update
-          io.to(roomId).emit('player:score', {
-            playerId: shooter.id,
-            score: shooter.score
+          // Award point to shooter
+          const shooter = gameState.players[projectile.playerId];
+          if (shooter) {
+            shooter.score += 1;
+            
+            // Notify all players of score update
+            io.to(roomId).emit('player:score', {
+              playerId: shooter.id,
+              score: shooter.score
+            });
+          }
+          
+          // Notify all players of health update
+          io.to(roomId).emit('player:health', {
+            playerId: player.id,
+            health: player.health
+          });
+        } else {
+          // Notify all players of health update
+          io.to(roomId).emit('player:health', {
+            playerId: player.id,
+            health: player.health
           });
         }
-        
-        // Notify all players of health update
-        io.to(roomId).emit('player:health', {
-          playerId: player.id,
-          health: player.health
-        });
-      } else {
-        // Notify all players of health update
-        io.to(roomId).emit('player:health', {
-          playerId: player.id,
-          health: player.health
-        });
       }
       
       continue;
     }
     
-    // Check if projectile is out of bounds
-    if (
-      projectile.position.x < 0 ||
-      projectile.position.x > 800 ||
-      projectile.position.y < 0 ||
-      projectile.position.y > 600
-    ) {
-      projectilesToRemove.push(projectileId);
-      continue;
-    }
+    // Update projectile position
+    projectile.position = result.position;
     
     // Check if projectile is too old (5 seconds)
     if (Date.now() - projectile.createdAt > 5000) {
@@ -502,156 +387,58 @@ const updateProjectiles = (io: Server, roomId: string, gameRoom: GameRoom) => {
   
   // Remove projectiles
   for (const projectileId of projectilesToRemove) {
-    delete gameRoom.projectiles[projectileId];
+    delete gameState.projectiles[projectileId];
     
     // Notify all players
     io.to(roomId).emit('projectile:remove', { projectileId });
   }
 };
 
-// Check projectile collision with obstacles
-const checkProjectileObstacleCollision = (projectile: Projectile, obstacles: Obstacle[]): boolean => {
-  // Projectile radius
-  const projectileRadius = 5;
-  
-  // Check collision with each obstacle
-  for (const obstacle of obstacles) {
-    // Simple AABB collision check with projectile as a circle
-    const closestX = Math.max(obstacle.position.x, Math.min(projectile.position.x, obstacle.position.x + obstacle.width));
-    const closestY = Math.max(obstacle.position.y, Math.min(projectile.position.y, obstacle.position.y + obstacle.height));
-    
-    // Calculate distance between closest point and circle center
-    const distanceX = projectile.position.x - closestX;
-    const distanceY = projectile.position.y - closestY;
-    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-    
-    // Check if distance is less than radius squared
-    if (distanceSquared < projectileRadius * projectileRadius) {
-      return true; // Collision detected
-    }
-  }
-  
-  return false; // No collision
-};
-
-// Check projectile collision with players
-const checkProjectilePlayerCollision = (projectile: Projectile, gameRoom: GameRoom): string | null => {
-  // Projectile radius
-  const projectileRadius = 5;
-  
-  // Player radius
-  const playerRadius = 20;
-  
-  // Combined radius for collision check
-  const combinedRadius = projectileRadius + playerRadius;
-  
-  // Check collision with each player
-  for (const playerId in gameRoom.players) {
-    const player = gameRoom.players[playerId];
-    
-    // Skip inactive players
-    if (!player.isActive) continue;
-    
-    // Skip shooter if friendly fire is disabled
-    if (playerId === projectile.playerId && !gameRoom.settings.friendlyFire) continue;
-    
-    // Calculate distance between projectile and player
-    const distanceX = projectile.position.x - player.position.x;
-    const distanceY = projectile.position.y - player.position.y;
-    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
-    
-    // Check if distance is less than combined radius squared
-    if (distanceSquared < combinedRadius * combinedRadius) {
-      return playerId; // Collision detected
-    }
-  }
-  
-  return null; // No collision
-};
+// These functions are now handled by the physics engine
 
 // Check win conditions
-const checkWinConditions = (io: Server, roomId: string, gameRoom: GameRoom) => {
+const checkWinConditions = (io: Server, roomId: string, gameState: GameState) => {
   // Check if time is up
-  if (gameRoom.timeRemaining <= 0) {
-    endGame(io, roomId, gameRoom);
+  if (gameState.timeRemaining <= 0) {
+    endGame(io, roomId, gameState);
     return;
   }
   
   // Check if any player reached the score limit
-  for (const playerId in gameRoom.players) {
-    const player = gameRoom.players[playerId];
-    if (player.score >= gameRoom.settings.scoreLimit) {
-      gameRoom.winner = playerId;
-      endGame(io, roomId, gameRoom);
+  for (const playerId in gameState.players) {
+    const player = gameState.players[playerId];
+    if (player.score >= gameState.settings.scoreLimit) {
+      gameState.winner = playerId;
+      endGame(io, roomId, gameState);
       return;
     }
   }
   
   // Check if only one player is active
-  const activePlayers = Object.values(gameRoom.players).filter(player => player.isActive);
-  if (activePlayers.length === 1 && Object.keys(gameRoom.players).length > 1) {
-    gameRoom.winner = activePlayers[0].id;
-    endGame(io, roomId, gameRoom);
+  const activePlayers = Object.values(gameState.players).filter(player => player.isActive);
+  if (activePlayers.length === 1 && Object.keys(gameState.players).length > 1) {
+    gameState.winner = activePlayers[0].id;
+    endGame(io, roomId, gameState);
     return;
   }
   
   // Check if no players are active
-  if (activePlayers.length === 0 && Object.keys(gameRoom.players).length > 0) {
-    endGame(io, roomId, gameRoom);
+  if (activePlayers.length === 0 && Object.keys(gameState.players).length > 0) {
+    endGame(io, roomId, gameState);
     return;
   }
 };
 
 // End game
-const endGame = (io: Server, roomId: string, gameRoom: GameRoom) => {
+const endGame = (io: Server, roomId: string, gameState: GameState) => {
   // Set game status to finished
-  gameRoom.status = 'finished';
+  gameState.status = 'finished';
   
   // Notify all players
-  io.to(roomId).emit('game:end', { winner: gameRoom.winner });
+  io.to(roomId).emit('game:end', { winner: gameState.winner });
 };
 
-// Generate player positions
-const generatePlayerPositions = (numPlayers: number): Position[] => {
-  const positions: Position[] = [];
-  
-  // Generate positions based on number of players
-  switch (numPlayers) {
-    case 1:
-      positions.push({ x: 400, y: 300 });
-      break;
-    case 2:
-      positions.push({ x: 200, y: 300 });
-      positions.push({ x: 600, y: 300 });
-      break;
-    case 3:
-      positions.push({ x: 400, y: 150 });
-      positions.push({ x: 200, y: 450 });
-      positions.push({ x: 600, y: 450 });
-      break;
-    case 4:
-      positions.push({ x: 200, y: 150 });
-      positions.push({ x: 600, y: 150 });
-      positions.push({ x: 200, y: 450 });
-      positions.push({ x: 600, y: 450 });
-      break;
-    default:
-      // For more than 4 players, distribute them in a circle
-      const radius = 200;
-      const center = { x: 400, y: 300 };
-      
-      for (let i = 0; i < numPlayers; i++) {
-        const angle = (i / numPlayers) * 2 * Math.PI;
-        positions.push({
-          x: center.x + radius * Math.cos(angle),
-          y: center.y + radius * Math.sin(angle)
-        });
-      }
-      break;
-  }
-  
-  return positions;
-};
+// Player positions are now generated by the physics engine
 
 // Get player color
 const getPlayerColor = (index: number): string => {
