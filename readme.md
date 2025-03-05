@@ -73,5 +73,3 @@ Create a collection of mini-games in just 2 hours using Claude Sonnet via OpenRo
 - Create engaging games featuring Snappy
 - Utilize AI for creative game elements
 - Build something fun and interactive
-
-
