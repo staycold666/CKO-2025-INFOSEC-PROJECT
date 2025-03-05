@@ -74,10 +74,4 @@ Create a collection of mini-games in just 2 hours using Claude Sonnet via OpenRo
 - Utilize AI for creative game elements
 - Build something fun and interactive
 
-## 👥 Team
 
-CKO 2025 Hack-a-sprint participants
-
-## 📄 License
-
-MIT License
