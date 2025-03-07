@@ -6,6 +6,7 @@ import { PhysicsEngine } from '../physics/PhysicsEngine';
 interface GameControlsProps {
   onMove: (position: Position) => void;
   onRotate: (rotation: number) => void;
+  onShoot: (position: Position, angle: number) => void;
   currentPlayerId?: string;
   canvasWidth: number;
   canvasHeight: number;
@@ -14,30 +15,62 @@ interface GameControlsProps {
 const GameControls: React.FC<GameControlsProps> = ({
   onMove,
   onRotate,
+  onShoot,
   currentPlayerId,
   canvasWidth,
   canvasHeight
 }) => {
-  const [keys, setKeys] = useState<{ [key: string]: boolean }>({});
-  const [mousePosition, setMousePosition] = useState<Position>({ x: 0, y: 0 });
+  // Simplified key state tracking with direct key codes
+  const [keysPressed, setKeysPressed] = useState(new Set<number>());
+  const [lastShootTime, setLastShootTime] = useState(0);
   
   const gameState = useAppSelector(state => state.game as GameState);
   
-  // Handle key presses
+  // Key constants
+  const KEY_W = 87;
+  const KEY_A = 65;
+  const KEY_S = 83;
+  const KEY_D = 68;
+  const KEY_UP = 38;
+  const KEY_DOWN = 40;
+  const KEY_LEFT = 37;
+  const KEY_RIGHT = 39;
+  const KEY_SPACE = 32;
+  
+  // Basic key event handlers
   useEffect(() => {
+    console.log('Setting up keyboard handlers');
+    
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent default behavior for arrow keys and WASD
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'].includes(e.key)) {
-        e.preventDefault();
-      }
+      const keyCode = e.keyCode || e.which;
+      console.log(`Key down: ${e.key} (${keyCode})`);
       
-      setKeys(prevKeys => ({ ...prevKeys, [e.key.toLowerCase()]: true }));
+      // Prevent default for game control keys
+      if ([KEY_W, KEY_A, KEY_S, KEY_D, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_SPACE].includes(keyCode)) {
+        e.preventDefault();
+        
+        // Add to pressed keys
+        setKeysPressed(prev => {
+          const newSet = new Set(prev);
+          newSet.add(keyCode);
+          return newSet;
+        });
+      }
     };
     
     const handleKeyUp = (e: KeyboardEvent) => {
-      setKeys(prevKeys => ({ ...prevKeys, [e.key.toLowerCase()]: false }));
+      const keyCode = e.keyCode || e.which;
+      console.log(`Key up: ${e.key} (${keyCode})`);
+      
+      // Remove from pressed keys
+      setKeysPressed(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(keyCode);
+        return newSet;
+      });
     };
     
+    // Add event listeners
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     
@@ -47,75 +80,121 @@ const GameControls: React.FC<GameControlsProps> = ({
     };
   }, []);
   
-  // Handle mouse movement for rotation
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!currentPlayerId || gameState.status !== 'playing') return;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setMousePosition({ x, y });
-    
-    // Calculate rotation angle
-    const player = gameState.players[currentPlayerId];
-    if (player) {
-      const dx = x - player.position.x;
-      const dy = y - player.position.y;
-      const angle = Math.atan2(dy, dx);
-      
-      onRotate(angle);
-    }
-  }, [currentPlayerId, gameState.players, gameState.status, onRotate]);
-  
-  // Handle player movement based on key presses
+  // Main game loop to process keyboard input
   useEffect(() => {
-    if (!currentPlayerId || gameState.status !== 'playing') return;
+    if (gameState.status !== 'playing') {
+      return;
+    }
     
-    const moveInterval = setInterval(() => {
-      let moved = false;
-      const position = { x: 0, y: 0 };
+    console.log('Setting up game control loop. Current player:', currentPlayerId);
+    
+    // Find a player ID to use
+    const playerIdToUse = currentPlayerId || Object.keys(gameState.players)[0];
+    if (!playerIdToUse) {
+      console.log('No player ID available');
+      return;
+    }
+    
+    const gameLoop = setInterval(() => {
+      // Get current keys
+      const keys = Array.from(keysPressed);
+      console.log('Current keys:', keys);
       
-      // Determine movement direction from keys
-      if (keys['arrowup'] || keys['w']) {
-        position.y = -1;
-        moved = true;
-      }
-      if (keys['arrowdown'] || keys['s']) {
-        position.y = 1;
-        moved = true;
-      }
-      if (keys['arrowleft'] || keys['a']) {
-        position.x = -1;
-        moved = true;
-      }
-      if (keys['arrowright'] || keys['d']) {
-        position.x = 1;
-        moved = true;
-      }
+      // 1. Handle movement (WASD)
+      let moveX = 0;
+      let moveY = 0;
       
-      // Normalize diagonal movement
-      if (position.x !== 0 && position.y !== 0) {
-        const length = Math.sqrt(position.x * position.x + position.y * position.y);
-        position.x /= length;
-        position.y /= length;
-      }
+      if (keys.includes(KEY_W)) moveY -= 1;
+      if (keys.includes(KEY_S)) moveY += 1;
+      if (keys.includes(KEY_A)) moveX -= 1;
+      if (keys.includes(KEY_D)) moveX += 1;
       
-      if (moved) {
-        // Use physics engine to validate movement
-        const physicsEngine = new PhysicsEngine(gameState, canvasWidth, canvasHeight);
-        const newPosition = physicsEngine.calculatePlayerMovement(currentPlayerId, position);
+      // If we have movement
+      if (moveX !== 0 || moveY !== 0) {
+        // Normalize diagonal movement
+        if (moveX !== 0 && moveY !== 0) {
+          const length = Math.sqrt(moveX * moveX + moveY * moveY);
+          moveX /= length;
+          moveY /= length;
+        }
         
-        if (newPosition) {
-          onMove(position);
+        const position = { x: moveX, y: moveY };
+        console.log('Moving:', position);
+        onMove(position);
+      }
+      
+      // 2. Handle rotation (arrow keys)
+      const player = gameState.players[playerIdToUse];
+      if (player) {
+        let angle = player.rotation || 0;
+        let rotationChanged = false;
+        
+        // Calculate angle based on arrow keys
+        if (keys.includes(KEY_UP) && !keys.includes(KEY_DOWN)) {
+          if (keys.includes(KEY_LEFT) && !keys.includes(KEY_RIGHT)) {
+            angle = -3 * Math.PI / 4; // Up-Left
+          } else if (keys.includes(KEY_RIGHT) && !keys.includes(KEY_LEFT)) {
+            angle = -Math.PI / 4; // Up-Right
+          } else {
+            angle = -Math.PI / 2; // Up
+          }
+          rotationChanged = true;
+        } else if (keys.includes(KEY_DOWN) && !keys.includes(KEY_UP)) {
+          if (keys.includes(KEY_LEFT) && !keys.includes(KEY_RIGHT)) {
+            angle = 3 * Math.PI / 4; // Down-Left
+          } else if (keys.includes(KEY_RIGHT) && !keys.includes(KEY_LEFT)) {
+            angle = Math.PI / 4; // Down-Right
+          } else {
+            angle = Math.PI / 2; // Down
+          }
+          rotationChanged = true;
+        } else if (keys.includes(KEY_LEFT) && !keys.includes(KEY_RIGHT)) {
+          angle = Math.PI; // Left
+          rotationChanged = true;
+        } else if (keys.includes(KEY_RIGHT) && !keys.includes(KEY_LEFT)) {
+          angle = 0; // Right
+          rotationChanged = true;
+        }
+        
+        if (rotationChanged) {
+          console.log('Rotating to:', angle);
+          onRotate(angle);
+        }
+        
+        // 3. Handle shooting (spacebar)
+        if (keys.includes(KEY_SPACE)) {
+          const now = Date.now();
+          // Limit to shooting every 300ms
+          if (now - lastShootTime > 300) {
+            console.log('Shooting!');
+            
+            // Get player position and rotation for shooting
+            const shootPosition = {
+              x: player.position.x + Math.cos(angle) * 30,
+              y: player.position.y + Math.sin(angle) * 30
+            };
+            
+            onShoot(shootPosition, angle);
+            setLastShootTime(now);
+          }
         }
       }
     }, 33); // ~30 FPS
     
-    return () => clearInterval(moveInterval);
-  }, [keys, gameState, currentPlayerId, onMove, canvasWidth, canvasHeight]);
+    return () => clearInterval(gameLoop);
+  }, [
+    gameState, 
+    currentPlayerId, 
+    keysPressed, 
+    lastShootTime, 
+    onMove, 
+    onRotate, 
+    onShoot, 
+    canvasWidth, 
+    canvasHeight
+  ]);
   
-  // Render an invisible div to capture mouse events
+  // Render an invisible div to capture key events
   return (
     <div
       style={{
@@ -124,10 +203,8 @@ const GameControls: React.FC<GameControlsProps> = ({
         left: 0,
         width: '100%',
         height: '100%',
-        cursor: gameState.status === 'playing' ? 'crosshair' : 'default',
         zIndex: 10
       }}
-      onMouseMove={handleMouseMove}
     />
   );
 };

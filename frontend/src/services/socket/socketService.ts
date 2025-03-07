@@ -24,7 +24,10 @@ class SocketService {
 
   // Initialize socket connection
   connect() {
-    if (this.socket) return;
+    if (this.socket) {
+      console.log('Socket already connected, skipping connection');
+      return;
+    }
 
     // Make sure we have a token
     const token = localStorage.getItem('token');
@@ -33,6 +36,7 @@ class SocketService {
       return;
     }
 
+    console.log('Connecting to socket server at:', this.API_URL);
     this.socket = io(this.API_URL, {
       transports: ['websocket'],
       auth: {
@@ -132,33 +136,153 @@ class SocketService {
 
   // Emit events
   joinRoom(roomId: string) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('Socket not connected, attempting to connect before joining room');
+      this.connect();
+    }
+    
+    if (!this.socket) {
+      console.error('Failed to connect socket, cannot join room');
+      return;
+    }
+    
+    console.log('Joining room:', roomId);
     this.socket.emit('room:join', { roomId });
   }
 
   leaveRoom(roomId: string) {
     if (!this.socket) return;
+    console.log('Leaving room:', roomId);
     this.socket.emit('room:leave', { roomId });
   }
 
   startGame(roomId: string) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('Socket not connected, attempting to connect before starting game');
+      this.connect();
+    }
+    
+    if (!this.socket) {
+      console.error('Failed to connect socket, cannot start game');
+      return;
+    }
+    
+    console.log('Starting game in room:', roomId);
     this.socket.emit('game:start', { roomId });
   }
 
   movePlayer(position: Position) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('Socket not connected, cannot move player');
+      return;
+    }
+    
+    console.log('Moving player:', position);
     this.socket.emit('player:move', { position });
+    
+    // TEMPORARY: Update player position locally for testing
+    const state = store.getState() as { auth: { user: { id: string } } };
+    const playerId = state.auth?.user?.id || Object.keys(
+      (store.getState() as any).game?.players || {}
+    )[0];
+    
+    if (playerId) {
+      // Calculate new position (simple movement without physics)
+      const gameState = (store.getState() as any).game;
+      const player = gameState?.players?.[playerId];
+      
+      if (player) {
+        const newPosition = {
+          x: player.position.x + position.x * 5, // 5 is player speed
+          y: player.position.y + position.y * 5
+        };
+        
+        // Update position in store
+        store.dispatch(updatePlayerPosition({
+          playerId,
+          position: newPosition
+        }));
+      }
+    }
   }
 
   rotatePlayer(rotation: number) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('Socket not connected, cannot rotate player');
+      return;
+    }
+    
+    console.log('Rotating player:', rotation);
     this.socket.emit('player:rotate', { rotation });
+    
+    // TEMPORARY: Update player rotation locally for testing
+    const state = store.getState() as { auth: { user: { id: string } } };
+    const playerId = state.auth?.user?.id || Object.keys(
+      (store.getState() as any).game?.players || {}
+    )[0];
+    
+    if (playerId) {
+      store.dispatch(updatePlayerRotation({
+        playerId,
+        rotation
+      }));
+    }
   }
 
   shoot(position: Position, direction: number) {
-    if (!this.socket) return;
+    if (!this.socket) {
+      console.warn('Socket not connected, cannot shoot');
+      return;
+    }
+    
+    console.log('Shooting from position:', position, 'direction:', direction);
     this.socket.emit('player:shoot', { position, direction });
+    
+    // TEMPORARY: Create a local projectile for immediate feedback
+    try {
+      const state = store.getState() as { auth: { user: { id: string } } };
+      const playerId = state.auth?.user?.id || Object.keys(
+        (store.getState() as any).game?.players || {}
+      )[0];
+      
+      if (playerId) {
+        // Generate a temporary projectile ID
+        const projectileId = `local_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        
+        // Calculate projectile velocity safely
+        const speed = 10;
+        // Make sure direction is a valid number
+        const safeDirection = Number.isFinite(direction) ? direction : 0;
+        const velocity = {
+          x: Math.cos(safeDirection) * speed,
+          y: Math.sin(safeDirection) * speed
+        };
+        
+        // Ensure no NaN or Infinity values in velocity
+        if (!Number.isFinite(velocity.x)) velocity.x = 0;
+        if (!Number.isFinite(velocity.y)) velocity.y = 0;
+        
+        // Create a new projectile
+        const projectile: Projectile = {
+          id: projectileId,
+          playerId: playerId,
+          position: { ...position }, // Clone position
+          velocity: velocity,
+          damage: 10,
+          createdAt: Date.now()  // Use current timestamp for createdAt
+        };
+        
+        console.log('Creating local projectile:', projectile);
+        store.dispatch(addProjectile(projectile));
+        
+        // Remove the projectile after a short time
+        setTimeout(() => {
+          store.dispatch(removeProjectile({ projectileId }));
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Error creating local projectile:', err);
+    }
   }
 }
 

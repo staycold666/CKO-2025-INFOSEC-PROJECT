@@ -138,6 +138,26 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 // @access  Private
 export const getMe = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Check if using mock user
+    if (req.user && req.user.id === 'mock-user-id') {
+      console.log('Getting mock user');
+      res.json({
+        _id: 'mock-user-id',
+        username: 'TestPlayer',
+        email: 'test@example.com',
+        avatar: 'https://via.placeholder.com/150',
+        isAdmin: false,
+        stats: {
+          wins: 10,
+          losses: 5,
+          totalGames: 15,
+          totalScore: 150,
+          accuracy: 0.75
+        }
+      });
+      return;
+    }
+
     // Check if MongoDB is connected
     if (mongoose.connection.readyState !== 1) {
       res.status(503).json({

@@ -24,7 +24,27 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
       // Get token from header
       token = req.headers.authorization.split(' ')[1];
 
-      // Verify token
+      // TEMPORARY: Check for mock token for testing
+      if (token === 'mock-token-for-testing') {
+        console.log('Using mock token for testing');
+        // Create a mock user
+        req.user = {
+          id: 'mock-user-id',
+          username: 'TestPlayer',
+          email: 'test@example.com',
+          avatar: 'https://via.placeholder.com/150',
+          stats: {
+            wins: 10,
+            losses: 5,
+            totalGames: 15,
+            totalScore: 150,
+            accuracy: 0.75
+          }
+        };
+        return next();
+      }
+
+      // Normal token verification
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string };
 
       // Get user from token

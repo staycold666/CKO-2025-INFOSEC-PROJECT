@@ -126,6 +126,30 @@ const GameRoom: React.FC = () => {
       border: '1px solid #000',
       backgroundColor: '#f0f0f0',
     },
+    // Controls Panel Styles
+    controlsPanel: {
+      position: 'absolute' as const,
+      bottom: '10px',
+      left: '10px',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      color: 'white',
+      padding: '10px',
+      borderRadius: '5px',
+      zIndex: 100,
+      width: '200px',
+    },
+    controlsTitle: {
+      fontSize: '16px',
+      fontWeight: 'bold',
+      marginTop: '0',
+      marginBottom: '10px',
+      textAlign: 'center' as const,
+    },
+    controlsList: {
+      listStyleType: 'none',
+      padding: '0',
+      margin: '0',
+    },
     scoreBoard: {
       width: '100%',
       marginTop: '1rem',
@@ -197,7 +221,7 @@ const GameRoom: React.FC = () => {
               <button
                 style={styles.button}
                 onClick={handleStartGame}
-                disabled={!currentRoom || currentRoom.players.length < 2}
+                disabled={!currentRoom}
               >
                 Start Game
               </button>
@@ -220,9 +244,7 @@ const GameRoom: React.FC = () => {
             ))}
           </div>
           
-          {isHost && currentRoom?.players.length < 2 && (
-            <p>Need at least 2 players to start the game.</p>
-          )}
+          {/* TEMPORARY: Removed minimum player requirement message */}
           
           {!isHost && (
             <p>Waiting for the host to start the game.</p>
@@ -305,11 +327,22 @@ const GameRoom: React.FC = () => {
           <GameControls
             onMove={handlePlayerMove}
             onRotate={handlePlayerRotate}
+            onShoot={handlePlayerShoot}
             currentPlayerId={user?.id}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
           />
         )}
+        
+        {/* Controls Panel */}
+        <div style={styles.controlsPanel}>
+          <h3 style={styles.controlsTitle}>Game Controls</h3>
+          <ul style={styles.controlsList}>
+            <li><strong>Move:</strong> WASD or Arrow Keys</li>
+            <li><strong>Aim:</strong> Arrow Keys</li>
+            <li><strong>Shoot:</strong> Spacebar</li>
+          </ul>
+        </div>
         
         <div style={styles.scoreBoard}>
           <div style={styles.scoreHeader}>

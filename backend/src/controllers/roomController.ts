@@ -3,11 +3,75 @@ import { validationResult } from 'express-validator';
 import Room from '../models/Room';
 import { IRoom, IUser } from '../types';
 
+// Mock data for testing
+const mockRooms = [
+  {
+    _id: 'room1',
+    name: 'Test Room 1',
+    host: {
+      _id: 'mock-user-id',
+      username: 'TestPlayer',
+      email: 'test@example.com',
+      avatar: 'https://via.placeholder.com/150'
+    },
+    players: [
+      {
+        _id: 'mock-user-id',
+        username: 'TestPlayer',
+        email: 'test@example.com',
+        avatar: 'https://via.placeholder.com/150'
+      }
+    ],
+    maxPlayers: 8,
+    status: 'waiting',
+    settings: {
+      timeLimit: 300,
+      scoreLimit: 20,
+      mapId: 'map1',
+      friendlyFire: false
+    }
+  },
+  {
+    _id: 'room2',
+    name: 'Test Room 2',
+    host: {
+      _id: 'player2',
+      username: 'Player2',
+      email: 'player2@example.com',
+      avatar: 'https://via.placeholder.com/150'
+    },
+    players: [
+      {
+        _id: 'player2',
+        username: 'Player2',
+        email: 'player2@example.com',
+        avatar: 'https://via.placeholder.com/150'
+      }
+    ],
+    maxPlayers: 4,
+    status: 'waiting',
+    settings: {
+      timeLimit: 180,
+      scoreLimit: 15,
+      mapId: 'map2',
+      friendlyFire: true
+    }
+  }
+];
+
 // @desc    Get all rooms
 // @route   GET /api/rooms
 // @access  Private
 export const getRooms = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Check if using mock user
+    if (req.user && req.user.id === 'mock-user-id') {
+      console.log('Using mock rooms data');
+      res.json(mockRooms);
+      return;
+    }
+
+    // Normal database query
     const rooms = await Room.find()
       .populate('host', 'username email avatar')
       .populate('players', 'username email avatar');
@@ -24,6 +88,21 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 // @access  Private
 export const getRoom = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Check if using mock user
+    if (req.user && req.user.id === 'mock-user-id') {
+      console.log('Getting mock room by ID:', req.params.id);
+      const mockRoom = mockRooms.find(room => room._id === req.params.id);
+      
+      if (!mockRoom) {
+        res.status(404).json({ message: 'Room not found' });
+        return;
+      }
+      
+      res.json(mockRoom);
+      return;
+    }
+
+    // Normal database query
     const room = await Room.findById(req.params.id)
       .populate('host', 'username email avatar')
       .populate('players', 'username email avatar');
@@ -52,6 +131,45 @@ export const createRoom = async (req: Request, res: Response): Promise<void> => 
 
   try {
     const { name, settings } = req.body;
+
+    // Check if using mock user
+    if (req.user && req.user.id === 'mock-user-id') {
+      console.log('Creating mock room');
+      
+      // Create a new mock room
+      const newMockRoom = {
+        _id: `room${mockRooms.length + 1}`,
+        name,
+        host: {
+          _id: 'mock-user-id',
+          username: 'TestPlayer',
+          email: 'test@example.com',
+          avatar: 'https://via.placeholder.com/150'
+        },
+        players: [
+          {
+            _id: 'mock-user-id',
+            username: 'TestPlayer',
+            email: 'test@example.com',
+            avatar: 'https://via.placeholder.com/150'
+          }
+        ],
+        maxPlayers: 8,
+        status: 'waiting',
+        settings: settings || {
+          timeLimit: 300,
+          scoreLimit: 20,
+          mapId: 'map1',
+          friendlyFire: false
+        }
+      };
+      
+      // Add to mock rooms
+      mockRooms.push(newMockRoom);
+      
+      res.status(201).json(newMockRoom);
+      return;
+    }
 
     // Create room
     const room = await Room.create({
@@ -244,11 +362,12 @@ export const startGame = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Check if there are enough players
-    if (room.players.length < 2) {
-      res.status(400).json({ message: 'Need at least 2 players to start the game' });
-      return;
-    }
+    // TEMPORARY: Removed minimum player check for testing
+    // Original code:
+    // if (room.players.length < 2) {
+    //   res.status(400).json({ message: 'Need at least 2 players to start the game' });
+    //   return;
+    // }
 
     // Update room status
     room.status = 'playing';

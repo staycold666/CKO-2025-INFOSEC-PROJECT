@@ -4,12 +4,31 @@ import apiService from '../../services/api/apiService';
 
 // Initial state
 const initialState: AuthState = {
-  user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  // TEMPORARY: Mock user for testing - remove this when authentication is needed
+  user: {
+    id: 'mock-user-id',
+    username: 'TestPlayer',
+    email: 'test@example.com',
+    avatar: 'https://via.placeholder.com/150',
+    stats: {
+      wins: 10,
+      losses: 5,
+      totalGames: 15,
+      totalScore: 150,
+      accuracy: 0.75
+    }
+  },
+  token: 'mock-token-for-testing',
+  // TEMPORARY: Force authentication to true to bypass login
+  isAuthenticated: true, // Changed from !!localStorage.getItem('token')
   isLoading: false,
   error: null,
 };
+
+// Store the mock token in localStorage to maintain consistency
+if (!localStorage.getItem('token')) {
+  localStorage.setItem('token', initialState.token as string);
+}
 
 // Async thunks
 export const login = createAsyncThunk(

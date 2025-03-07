@@ -183,32 +183,58 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   // Render projectiles
   const renderProjectiles = (ctx: CanvasRenderingContext2D, projectiles: Record<string, Projectile>) => {
     Object.values(projectiles).forEach(projectile => {
-      // Draw projectile trail
-      const trailLength = 10;
-      const trailX = projectile.position.x - projectile.velocity.x * trailLength / projectile.velocity.x;
-      const trailY = projectile.position.y - projectile.velocity.y * trailLength / projectile.velocity.y;
+      // Safety check for valid position
+      if (!projectile.position ||
+          !Number.isFinite(projectile.position.x) ||
+          !Number.isFinite(projectile.position.y)) {
+        console.warn('Invalid projectile position:', projectile);
+        return;
+      }
       
-      // Create gradient for trail
-      const gradient = ctx.createLinearGradient(
-        trailX, trailY,
-        projectile.position.x, projectile.position.y
-      );
-      gradient.addColorStop(0, 'rgba(255, 0, 0, 0)');
-      gradient.addColorStop(1, 'rgba(255, 0, 0, 0.8)');
-      
-      // Draw trail
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(trailX, trailY);
-      ctx.lineTo(projectile.position.x, projectile.position.y);
-      ctx.stroke();
-      
-      // Draw projectile
-      ctx.fillStyle = '#ff0000';
-      ctx.beginPath();
-      ctx.arc(projectile.position.x, projectile.position.y, 5, 0, Math.PI * 2);
-      ctx.fill();
+      try {
+        // Draw projectile (the simple red dot)
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.arc(projectile.position.x, projectile.position.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Only render trail if we have valid velocity values
+        if (projectile.velocity &&
+            Number.isFinite(projectile.velocity.x) &&
+            Number.isFinite(projectile.velocity.y) &&
+            (projectile.velocity.x !== 0 || projectile.velocity.y !== 0)) {
+          
+          // Calculate trail point safely (avoid division by zero)
+          const trailLength = 10;
+          let trailX = projectile.position.x;
+          let trailY = projectile.position.y;
+          
+          // Move back from projectile position in opposite direction of velocity
+          trailX -= projectile.velocity.x * trailLength / Math.max(1, Math.abs(projectile.velocity.x));
+          trailY -= projectile.velocity.y * trailLength / Math.max(1, Math.abs(projectile.velocity.y));
+          
+          // Check if the calculated trail point is valid
+          if (Number.isFinite(trailX) && Number.isFinite(trailY)) {
+            // Create gradient for trail
+            const gradient = ctx.createLinearGradient(
+              trailX, trailY,
+              projectile.position.x, projectile.position.y
+            );
+            gradient.addColorStop(0, 'rgba(255, 0, 0, 0)');
+            gradient.addColorStop(1, 'rgba(255, 0, 0, 0.8)');
+            
+            // Draw trail
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(trailX, trailY);
+            ctx.lineTo(projectile.position.x, projectile.position.y);
+            ctx.stroke();
+          }
+        }
+      } catch (err) {
+        console.error('Error rendering projectile:', err);
+      }
     });
   };
   

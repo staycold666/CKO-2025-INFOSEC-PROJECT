@@ -33,12 +33,15 @@ const Lobby: React.FC = () => {
 
   // Fetch rooms on component mount
   useEffect(() => {
+    console.log('Lobby: Fetching rooms...');
     dispatch(fetchRooms());
   }, [dispatch]);
 
   // Navigate to game room if joined
   useEffect(() => {
+    console.log('Lobby: Current room changed:', currentRoom);
     if (currentRoom) {
+      console.log(`Lobby: Navigating to game room ${currentRoom.id}`);
       navigate(`/game/${currentRoom.id}`);
     }
   }, [currentRoom, navigate]);
@@ -46,9 +49,15 @@ const Lobby: React.FC = () => {
   // Show error message when error changes
   useEffect(() => {
     if (error) {
+      console.error('Lobby: Error:', error);
       alert(`Error: ${error}`);
     }
   }, [error]);
+
+  // Log user info
+  useEffect(() => {
+    console.log('Lobby: User info:', user);
+  }, [user]);
 
   const handleCreateRoom = (e: React.FormEvent) => {
     e.preventDefault();

@@ -250,6 +250,8 @@ const updateCountdown = (io: Server, roomId: string, gameState: GameState) => {
     if (players.length === 0) {
       // Get players from socket room
       const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
+      console.log(`Initializing players for room ${roomId}. Sockets in room:`, socketsInRoom ? socketsInRoom.size : 0);
+      
       if (socketsInRoom) {
         const playerPositions = physicsEngine.generatePlayerPositions(socketsInRoom.size);
         let i = 0;
@@ -259,12 +261,17 @@ const updateCountdown = (io: Server, roomId: string, gameState: GameState) => {
           if (socket) {
             // Get user data from socket
             const userData = socket.data.user || { id: socketId, username: `Player ${i + 1}` };
+            console.log(`Creating player for socket ${socketId}:`, userData);
+            
+            // Create player with fixed position for testing
+            const playerPosition = { x: 400, y: 300 };
+            console.log(`Player position:`, playerPosition);
             
             // Create player
             gameState.players[socketId] = {
               id: socketId,
-              username: userData.username,
-              position: playerPositions[i] || { x: 400, y: 300 },
+              username: userData.username || `Player ${i + 1}`,
+              position: playerPosition,
               rotation: 0,
               health: 100,
               score: 0,
@@ -276,6 +283,26 @@ const updateCountdown = (io: Server, roomId: string, gameState: GameState) => {
             i++;
           }
         }
+        
+        console.log(`Initialized ${i} players:`, Object.keys(gameState.players));
+      } else {
+        console.log(`No sockets found in room ${roomId}`);
+        
+        // TEMPORARY: Create a dummy player for single-player testing
+        const dummyId = `dummy-${Date.now()}`;
+        console.log(`Creating dummy player with ID ${dummyId}`);
+        
+        gameState.players[dummyId] = {
+          id: dummyId,
+          username: "Player 1",
+          position: { x: 400, y: 300 },
+          rotation: 0,
+          health: 100,
+          score: 0,
+          isActive: true,
+          lastShot: 0,
+          color: getPlayerColor(0)
+        };
       }
     }
     
@@ -414,16 +441,33 @@ const checkWinConditions = (io: Server, roomId: string, gameState: GameState) =>
     }
   }
   
-  // Check if only one player is active
+  // TEMPORARY: Modified to allow single-player testing
+  // Original code:
+  // const activePlayers = Object.values(gameState.players).filter(player => player.isActive);
+  // if (activePlayers.length === 1 && Object.keys(gameState.players).length > 1) {
+  //   gameState.winner = activePlayers[0].id;
+  //   endGame(io, roomId, gameState);
+  //   return;
+  // }
+  
+  // Only end the game if there are multiple players and only one is active
   const activePlayers = Object.values(gameState.players).filter(player => player.isActive);
-  if (activePlayers.length === 1 && Object.keys(gameState.players).length > 1) {
+  const totalPlayers = Object.keys(gameState.players).length;
+  if (activePlayers.length === 1 && totalPlayers > 1) {
     gameState.winner = activePlayers[0].id;
     endGame(io, roomId, gameState);
     return;
   }
   
-  // Check if no players are active
-  if (activePlayers.length === 0 && Object.keys(gameState.players).length > 0) {
+  // TEMPORARY: Modified to allow single-player testing
+  // Original code:
+  // if (activePlayers.length === 0 && Object.keys(gameState.players).length > 0) {
+  //   endGame(io, roomId, gameState);
+  //   return;
+  // }
+  
+  // Only end the game if there are multiple players and none are active
+  if (activePlayers.length === 0 && totalPlayers > 1) {
     endGame(io, roomId, gameState);
     return;
   }
